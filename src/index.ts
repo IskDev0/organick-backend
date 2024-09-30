@@ -6,7 +6,7 @@ import products from "./routes/products";
 const app = new Hono().basePath("/api/v1")
 
 app.use("*", cors({
-  origin: [process.env.PORT as string, "http://localhost:3000"],
+  origin: [process.env.FRONTEND_URL as string, "http://localhost:3000"],
   credentials: true,
 }))
 

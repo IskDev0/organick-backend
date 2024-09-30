@@ -4,10 +4,52 @@ import {IProduct, IProductWithCategory} from "../types/IProduct";
 
 const app = new Hono()
 
+app.get("/search", async (c: Context) => {
+    const { category_id, name, limit = 10, page = 1 } = c.req.query();
+
+    const offset = (Number(page) - 1) * Number(limit);
+
+    let query = `
+        SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image_url, categories.name as category
+        FROM products
+        JOIN categories ON products.category_id = categories.id
+        WHERE 1 = 1`;
+
+    const queryParams: (string | number)[] = [];
+
+    if (category_id) {
+        query += ` AND products.category_id = $${queryParams.length + 1}`;
+        queryParams.push(category_id);
+    }
+
+    if (name) {
+        query += ` AND products.name LIKE $${queryParams.length + 1}`;
+        queryParams.push(`%${name}%`);
+    }
+
+    query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(Number(limit), offset);
+
+    try {
+        const q = await pool.query<IProductWithCategory[]>(query, queryParams);
+
+        if (q.rows.length === 0) {
+            return c.json({ message: "No products found" }, 404);
+        }
+
+        return c.json(q.rows);
+
+    } catch (error) {
+        return c.json({ message: (error as Error).message });
+    }
+});
+
+
+
 app.get("/", async (c: Context) => {
     try {
         let q = await pool.query<IProductWithCategory[]>(`
-            SELECT products.id, products.name, products.price, products.discount, products.rating, categories.name as category
+            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image_url, categories.name as category
             from products
             join categories on products.category_id = categories.id`)
 
@@ -18,6 +60,30 @@ app.get("/", async (c: Context) => {
         return c.json(q.rows)
     } catch (error) {
         return c.json({message: (error as Error).message})
+    }
+})
+
+app.get("/:id", async (c: Context) => {
+    const {id} = c.req.param();
+
+    if (!id) {
+        return c.json({message: "Product id not provided"}, 400);
+    }
+
+    try {
+        let q = await pool.query<IProductWithCategory[]>(`
+            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image_url, categories.name as category
+            from products
+            join categories on products.category_id = categories.id
+            where products.id = $1`, [id])
+
+        if (q.rows.length === 0) {
+            return c.json({message: "Product not found"}, 404);
+        }
+
+        return c.json(q.rows[0])
+    } catch (error) {
+        return c.json({message: (error as Error).message}, 500);
     }
 })
 
@@ -97,27 +163,6 @@ app.delete("/:id", async (c: Context) => {
         return c.json({message: (error as Error).message}, 500);
     }
 })
-
-app.get("/search", async (c: Context) => {
-    const {category_id, name} = c.req.query();
-
-    try {
-        const q = await pool.query<IProductWithCategory[]>(`
-                SELECT products.id, products.name, products.price, products.discount, products.rating, categories.name as category
-                FROM products
-                JOIN categories ON products.category_id = categories.id
-                WHERE products.category_id = $1 OR products.name LIKE $2`, [category_id, name]);
-
-        if (q.rows.length === 0) {
-            return c.json({message: "No products found"}, 404);
-        }
-
-        return c.json(q.rows);
-
-    } catch (error) {
-        return c.json({message: (error as Error).message});
-    }
-});
 
 
 export default app
