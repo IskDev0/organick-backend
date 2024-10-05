@@ -12,7 +12,7 @@ app.get("/search", async (c: Context) => {
   const offset = (Number(page) - 1) * Number(limit);
 
   let query = `
-        SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image_url, categories.name as category
+        SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
         FROM products
         JOIN categories ON products.category_id = categories.id
         WHERE 1 = 1`;
@@ -49,7 +49,7 @@ app.get("/search", async (c: Context) => {
 app.get("/", async (c: Context) => {
   try {
     let q = await pool.query<IProductWithCategory[]>(`
-            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image_url, categories.name as category
+            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
             from products
             join categories on products.category_id = categories.id`);
 
@@ -72,7 +72,7 @@ app.get("/:id", async (c: Context) => {
 
   try {
     let q = await pool.query<IProductWithCategory[]>(`
-            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image_url, categories.name as category
+            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
             from products
             join categories on products.category_id = categories.id
             where products.id = $1`, [id]);
@@ -94,16 +94,19 @@ app.post("/", authMiddleware, checkRole("admin"), async (c: Context) => {
     return c.json({ message: "Product not provided" }, 400);
   }
 
+  //TODO: Add file uploading from formData
+
   try {
-    await pool.query<IProduct>("INSERT INTO products (name, description, price, image_url, category_id, stock, is_active, discount) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", [
+    await pool.query<IProduct>("INSERT INTO products (name, description, price, image, category_id, stock, is_active, discount, old_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", [
       productBody.name,
       productBody.description,
-      productBody.price,
-      productBody.image_url,
+      productBody.discount > 0 ? productBody.price * (1 - productBody.discount / 100) : null,
+      productBody.image,
       productBody.category_id,
       productBody.stock,
       productBody.is_active,
-      productBody.discount
+      productBody.discount,
+      productBody.price
     ]);
 
     return c.json({ message: "Product created successfully" });
@@ -132,11 +135,11 @@ app.patch("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
       return c.json({ message: "Product not found" }, 404);
     }
 
-    await pool.query("UPDATE products SET name = $1, description = $2, price = $3, image_url = $4, category_id = $5, stock = $6, is_active = $7, discount = $8 WHERE id = $9", [
+    await pool.query("UPDATE products SET name = $1, description = $2, price = $3, image = $4, category_id = $5, stock = $6, is_active = $7, discount = $8 WHERE id = $9", [
       productBody.name,
       productBody.description,
       productBody.price,
-      productBody.image_url,
+      productBody.image,
       productBody.category_id,
       productBody.stock,
       productBody.is_active,
