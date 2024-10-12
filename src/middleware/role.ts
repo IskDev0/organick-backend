@@ -2,7 +2,7 @@ import { getCookie } from "hono/cookie";
 import { Context, Next } from "hono";
 import { decode } from "hono/jwt";
 
-const checkRole = (requiredRole: string) => {
+const checkRole = (requiredRoles: string | string[]) => {
   return async (c: Context, next: Next) => {
     const token = getCookie(c, "accessToken");
 
@@ -12,12 +12,15 @@ const checkRole = (requiredRole: string) => {
 
     const { payload } = decode(token);
 
-    if (payload.role !== requiredRole) {
+    const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+
+    if (!roles.includes(payload.role as string)) {
       return c.json({ message: "You are not allowed to access this resource" }, 401);
     }
 
     await next();
   };
 };
+
 
 export default checkRole;

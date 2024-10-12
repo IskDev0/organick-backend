@@ -16,21 +16,17 @@ app.get("/:productId", async (c: Context) => {
   const limit = parseInt(c.req.query("limit") || "10");
   const offset = (page - 1) * limit;
 
-  if (!productId) {
-    return c.json({ message: "Product ID not provided" }, 400);
-  }
-
   try {
     const q = await pool.query<IReview[]>(`
-      SELECT *
+      SELECT r.id, r.product_id, r.rating, r.comment, r.user_id, r.created_at, u.first_name, u.last_name 
       FROM reviews r 
+      JOIN users u ON r.user_id = u.id 
       WHERE r.product_id = $1 
       LIMIT $2 OFFSET $3;`, [productId, limit, offset]);
 
     const totalReviewsResult = await pool.query(`SELECT COUNT(*) FROM reviews WHERE product_id = $1`, [productId]);
     const totalReviews = parseInt(totalReviewsResult.rows[0].count);
     const totalPages = Math.ceil(totalReviews / limit);
-
 
     if (q.rows.length === 0) {
       return c.json({ message: "No reviews found" }, 404);

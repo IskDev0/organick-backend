@@ -3,6 +3,7 @@ import {cors} from 'hono/cors'
 import auth from './routes/auth'
 import products from "./routes/products";
 import reviews from "./routes/reviews";
+import news from "./routes/news";
 
 const app = new Hono().basePath("/api/v1")
 
@@ -16,6 +17,7 @@ app.use("*", cors({
 app.route("/auth", auth)
 app.route("/products", products)
 app.route("/reviews", reviews)
+app.route("/news", news)
 
 export default {
   port: process.env.PORT,
