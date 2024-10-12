@@ -7,7 +7,7 @@ const errorMessages:Record<string | number, string> = {
 };
 
 export default function handleSQLError(error:PostgresError) {
-    const message = errorMessages[error.code] || 'Произошла ошибка на сервере.';
+    const message = errorMessages[error.code] || error;
 
     const status = (() => {
         switch (error.code) {

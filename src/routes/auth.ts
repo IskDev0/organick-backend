@@ -58,7 +58,7 @@ app.post("/login", async (c: Context) => {
     const payload = {
       id: user.id,
       role: user.role,
-      exp: Math.floor(Date.now() / 1000) + 60 // 1 hour
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 // 1 hour
     };
     const accessToken: string = await sign(payload, process.env.ACCESS_SECRET as string);
     const refreshToken: string = await sign({

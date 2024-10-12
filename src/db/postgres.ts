@@ -9,4 +9,8 @@ const pool = new Pool({
     database: process.env.POSTGRESQL_DATABASE,
 })
 
+pg.types.setTypeParser(20, function (value) {
+    return parseInt(value);
+});
+
 export default pool
