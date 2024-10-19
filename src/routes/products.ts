@@ -48,20 +48,39 @@ app.get("/search", async (c: Context) => {
 
 app.get("/", async (c: Context) => {
   try {
+    const page = Number(c.req.query("page") || 1);
+    const limit = Number(c.req.query("limit") || 10);
+    const offset = (page - 1) * limit;
+
     let q = await pool.query<IProductWithCategory[]>(`
-            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
-            from products
-            join categories on products.category_id = categories.id`);
+      SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
+      FROM products
+      JOIN categories ON products.category_id = categories.id
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    const totalProductsResult = await pool.query(`SELECT COUNT(*) FROM products`);
+    const totalProducts = parseInt(totalProductsResult.rows[0].count);
+    const totalPages = Math.ceil(totalProducts / limit);
 
     if (q.rows.length === 0) {
       return c.json({ message: "No products found" });
     }
 
-    return c.json(q.rows);
+    return c.json({
+      data: q.rows,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalProducts,
+        limit,
+      },
+    });
   } catch (error) {
     return c.json({ message: (error as Error).message });
   }
 });
+
 
 app.get("/:id", async (c: Context) => {
   const { id } = c.req.param();
