@@ -63,6 +63,7 @@ app.post("/login", async (c: Context) => {
     const accessToken: string = await sign(payload, process.env.ACCESS_SECRET as string);
     const refreshToken: string = await sign({
       id: user.id,
+      role: user.role,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours
     }, process.env.REFRESH_SECRET as string);
 
@@ -70,14 +71,14 @@ app.post("/login", async (c: Context) => {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 60 // 1 hour
+      maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 24 // 24 hours
+      maxAge: 60 * 60 * 24 * 7 // 24 hours
     });
 
     return c.json({
@@ -101,7 +102,8 @@ app.post("/refresh", async (c: Context) => {
 
   try {
     const payload: JWTPayload = await verify(refreshToken, process.env.REFRESH_SECRET as string);
-    const tokens = await generateTokens(payload.id as string);
+
+    const tokens = await generateTokens(payload.id as string, payload.role as string);
 
     setCookie(c, "accessToken", tokens.accessToken, {
       httpOnly: false,

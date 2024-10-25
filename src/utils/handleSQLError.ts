@@ -1,29 +1,29 @@
 import PostgresError from "../types/PostgresError";
-import type {StatusCode} from "hono/dist/types/utils/http-status";
+import type { StatusCode } from "hono/dist/types/utils/http-status";
 
 //TODO: Add more error messages
-const errorMessages:Record<string | number, string> = {
-    '23505': 'Ошибка: запись с указанным email уже существует.',
+const errorMessages: Record<string | number, string> = {
+  "23505": "A record with the specified email already exists."
 };
 
-export default function handleSQLError(error:PostgresError) {
-    const message = errorMessages[error.code] || error;
+export default function handleSQLError(error: PostgresError) {
+  const message = errorMessages[error.code] || error;
 
-    const status = (() => {
-        switch (error.code) {
-            case '23505':
-            case '23503':
-                return 400;
-            case '22P02':
-                return 422;
-            default:
-                return 500;
-        }
-    })();
+  const status = (() => {
+    switch (error.code) {
+      case "23505":
+      case "23503":
+        return 400;
+      case "22P02":
+        return 422;
+      default:
+        return 500;
+    }
+  })();
 
-    return {
-        status: status as StatusCode,
-        message,
-    };
+  return {
+    status: status as StatusCode,
+    message
+  };
 }
 

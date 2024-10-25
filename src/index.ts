@@ -1,5 +1,6 @@
 import {Hono} from 'hono'
 import {cors} from 'hono/cors'
+import { logger } from "hono/logger";
 import auth from './routes/auth'
 import products from "./routes/products";
 import reviews from "./routes/reviews";
@@ -13,6 +14,7 @@ app.use("*", cors({
   origin: [process.env.FRONTEND_URL as string, "http://localhost:3000"],
   credentials: true,
 }))
+app.use(logger())
 
 //TODO: Extract sql queries to db folder
 
