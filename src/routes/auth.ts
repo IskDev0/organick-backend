@@ -7,6 +7,8 @@ import { getCookie, setCookie } from "hono/cookie";
 import { IUser } from "../types/IUser";
 import { JWTPayload } from "hono/dist/types/utils/jwt/types";
 import generateTokens from "../utils/auth/generateTokens";
+import authMiddleware from "../middleware/auth";
+import getUserInfo from "../utils/auth/getUserInfo";
 
 const app = new Hono();
 
@@ -33,7 +35,17 @@ app.post("/register", async (c: Context) => {
     return c.json({ message }, status);
   }
 
-  return c.json({ message: "User created successfully" });
+  const createdUser = await pool.query<IUser>("SELECT * FROM users WHERE email = $1", [userBody.email]);
+  const user = createdUser.rows[0];
+
+  return c.json({
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role
+  });
 });
 
 app.post("/login", async (c: Context) => {
@@ -52,7 +64,7 @@ app.post("/login", async (c: Context) => {
 
     const isValidPassword: boolean = await Bun.password.verify(userBody.password, user.password_hash as string);
     if (!isValidPassword) {
-      return c.json({ message: "Invalid password" }, 401);
+      return c.json({ message: "Invalid password" }, 422);
     }
 
     const payload = {
@@ -92,6 +104,23 @@ app.post("/login", async (c: Context) => {
   } catch (error) {
     return c.json({ message: (error as Error).message });
   }
+});
+
+app.get("/user", authMiddleware, async (c: Context) => {
+
+  const { id } = getUserInfo(c);
+
+  const result = await pool.query<IUser>("SELECT * FROM users WHERE id = $1", [id]);
+  const user = result.rows[0];
+
+  return c.json({
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role
+  });
 });
 
 app.post("/refresh", async (c: Context) => {
