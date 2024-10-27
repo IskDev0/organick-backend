@@ -8,39 +8,82 @@ const app = new Hono();
 
 app.get("/search", async (c: Context) => {
   const { category_id, name, limit = 10, page = 1 } = c.req.query();
+  const parsedLimit = Number(limit);
+  const parsedPage = Number(page);
+  const offset = (parsedPage - 1) * parsedLimit;
 
-  const offset = (Number(page) - 1) * Number(limit);
-
-  let query = `
-        SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
-        FROM products
-        JOIN categories ON products.category_id = categories.id
-        WHERE 1 = 1`;
-
-  const queryParams: (string | number)[] = [];
+  const totalQueryParams: (string | number)[] = [];
+  let totalQuery = `SELECT COUNT(*) FROM products WHERE 1 = 1`;
 
   if (category_id) {
-    query += ` AND products.category_id = $${queryParams.length + 1}`;
-    queryParams.push(category_id);
+    totalQuery += ` AND category_id = $${totalQueryParams.length + 1}`;
+    totalQueryParams.push(category_id);
   }
 
   if (name) {
-    query += ` AND products.name LIKE $${queryParams.length + 1}`;
-    queryParams.push(`%${name}%`);
+    totalQuery += ` AND name ILIKE $${totalQueryParams.length + 1}`;
+    totalQueryParams.push(`%${name}%`);
   }
 
-  query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
-  queryParams.push(Number(limit), offset);
-
   try {
+    const totalProductsResult = await pool.query(totalQuery, totalQueryParams);
+    const totalProducts = parseInt(totalProductsResult.rows[0].count);
+    const totalPages = Math.ceil(totalProducts / parsedLimit);
+
+    const queryParams: (string | number)[] = [];
+    let query = `
+      SELECT 
+        products.id, 
+        products.name, 
+        products.price, 
+        products.discount, 
+        products.old_price, 
+        products.rating, 
+        products.image, 
+        categories.name as category
+      FROM products
+      JOIN categories ON products.category_id = categories.id
+      WHERE 1 = 1
+    `;
+
+    if (category_id) {
+      query += ` AND products.category_id = $${queryParams.length + 1}`;
+      queryParams.push(category_id);
+    }
+
+    if (name) {
+      query += ` AND products.name ILIKE $${queryParams.length + 1}`;
+      queryParams.push(`%${name}%`);
+    }
+
+    query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(parsedLimit, offset);
+
     const q = await pool.query<IProductWithCategory[]>(query, queryParams);
 
     if (q.rows.length === 0) {
       return c.json({ message: "No products found" }, 404);
     }
 
-    return c.json(q.rows);
+    return c.json({
+      data: q.rows,
+      pagination: {
+        currentPage: parsedPage,
+        totalPages,
+        totalProducts,
+        limit: parsedLimit
+      }
+    });
 
+  } catch (error) {
+    return c.json({ message: (error as Error).message }, 500);
+  }
+});
+
+app.get("/categories", async (c: Context) => {
+  try {
+    const q = await pool.query("SELECT * FROM categories");
+    return c.json(q.rows);
   } catch (error) {
     return c.json({ message: (error as Error).message });
   }
@@ -73,14 +116,13 @@ app.get("/", async (c: Context) => {
         currentPage: page,
         totalPages,
         totalProducts,
-        limit,
-      },
+        limit
+      }
     });
   } catch (error) {
     return c.json({ message: (error as Error).message });
   }
 });
-
 
 app.get("/:id", async (c: Context) => {
   const { id } = c.req.param();
@@ -91,7 +133,7 @@ app.get("/:id", async (c: Context) => {
 
   try {
     let q = await pool.query<IProductWithCategory[]>(`
-            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, categories.name as category
+            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, products.description, categories.name as category
             from products
             join categories on products.category_id = categories.id
             where products.id = $1`, [id]);
@@ -135,7 +177,7 @@ app.post("/", authMiddleware, checkRole("admin"), async (c: Context) => {
   }
 });
 
-app.patch("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
+app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
   const { id } = c.req.param();
   const productBody = await c.req.json();
 
