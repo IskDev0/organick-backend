@@ -10,7 +10,8 @@ export interface IProduct {
     is_active: boolean,
     discount: number,
     created_at: Date,
-    updated_at: Date
+    updated_at: Date,
+    quantity: number
 }
 
 export interface IProductWithCategory extends IProduct {

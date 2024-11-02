@@ -26,7 +26,7 @@ app.post("/", async (c: Context) => {
     return c.json({ message: "Email not provided" }, 400);
   }
 
-  const hasSubscribed = await pool.query("SELECT * FROM subscribers WHERE email = $1", [email]);
+  const hasSubscribed = await pool.query("SELECT * FROM subscribers WHERE email = $1 AND is_subscribed = false", [email]);
 
   if (hasSubscribed.rows.length > 0) {
     try {

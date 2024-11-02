@@ -133,7 +133,7 @@ app.get("/:id", async (c: Context) => {
 
   try {
     let q = await pool.query<IProductWithCategory[]>(`
-            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, products.description, categories.name as category
+            SELECT products.id, products.name, products.price, products.discount, products.old_price, products.rating, products.image, products.description, products.stock, categories.name as category_name, categories.id as category_id
             from products
             join categories on products.category_id = categories.id
             where products.id = $1`, [id]);

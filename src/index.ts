@@ -7,6 +7,7 @@ import reviews from "./routes/reviews";
 import news from "./routes/news";
 import testimonials from "./routes/testimonials";
 import subscription from "./routes/subscription";
+import orders from "./routes/orders";
 
 const app = new Hono().basePath("/api/v1")
 
@@ -24,6 +25,7 @@ app.route("/reviews", reviews)
 app.route("/news", news)
 app.route("/testimonials", testimonials)
 app.route("/subscription", subscription)
+app.route("/orders", orders)
 
 export default {
   port: process.env.PORT,
