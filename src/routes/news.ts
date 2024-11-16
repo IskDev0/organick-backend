@@ -10,6 +10,28 @@ import getUserInfo from "../utils/auth/getUserInfo";
 
 const app = new Hono();
 
+app.get("/author/:id", async (c: Context) => {
+
+  const id = c.req.param("id");
+
+  try {
+    const q = await pool.query<INewsWithUser[]>(`
+        SELECT n.id, n.title, n.content, n.user_id, n.preview, n.short_description, n.created_at, u.first_name, u.last_name
+        FROM news n
+        JOIN users u on n.user_id = u.id
+        WHERE u.id = $1`, [id]);
+
+    if (q.rows.length === 0) {
+      return c.json({ message: "No news found" }, 404);
+    }
+    return c.json(q.rows);
+
+  }catch (error: any | PostgresError) {
+    const { status, message } = handleSQLError(error as PostgresError);
+    return c.json({ message }, status);
+  }
+})
+
 app.get("/", async (c: Context) => {
 
   const page = parseInt(c.req.query("page") || "1");
