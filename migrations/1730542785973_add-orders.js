@@ -41,7 +41,7 @@ exports.up = (pgm) => {
       notNull: true,
       default: pgm.func("current_timestamp")
     }
-  });
+  }, {ifNotExists: true, cascade: true});
 
   pgm.createTable("order_items", {
     id: {
@@ -69,7 +69,7 @@ exports.up = (pgm) => {
       type: "numeric(10,2)",
       notNull: true
     }
-  });
+  }, {ifNotExists: true, cascade: true});
 
   pgm.createTable("payments", {
     id: {
@@ -101,7 +101,7 @@ exports.up = (pgm) => {
       notNull: true,
       default: pgm.func("current_timestamp")
     }
-  })
+  }, {ifNotExists: true, cascade: true})
 };
 
 /**
