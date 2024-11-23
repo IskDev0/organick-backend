@@ -10,6 +10,7 @@ import subscription from "./routes/subscription";
 import orders from "./routes/orders";
 import users from "./routes/users";
 import other from "./routes/other";
+import applications from "./routes/applications";
 
 const app = new Hono().basePath("/api/v1")
 
@@ -30,6 +31,7 @@ app.route("/subscription", subscription)
 app.route("/orders", orders)
 app.route("/users", users)
 app.route("/other", other)
+app.route("/applications", applications)
 
 export default {
   port: process.env.PORT,
