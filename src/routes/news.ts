@@ -49,9 +49,6 @@ app.get("/", async (c: Context) => {
     const totalNews = parseInt(totalNewsResult.rows[0].count);
     const totalPages = Math.ceil(totalNews / limit);
 
-    if (q.rows.length === 0) {
-      return c.json({ message: "No news found" }, 404);
-    }
     return c.json({
       data: q.rows,
       pagination: {

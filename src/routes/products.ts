@@ -106,10 +106,6 @@ app.get("/", async (c: Context) => {
     const totalProducts = parseInt(totalProductsResult.rows[0].count);
     const totalPages = Math.ceil(totalProducts / limit);
 
-    if (q.rows.length === 0) {
-      return c.json({ message: "No products found" });
-    }
-
     return c.json({
       data: q.rows,
       pagination: {

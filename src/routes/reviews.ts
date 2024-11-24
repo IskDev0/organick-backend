@@ -9,6 +9,25 @@ import handleSQLError from "../utils/handleSQLError";
 
 const app = new Hono();
 
+app.get("/", authMiddleware, async (c: Context) => {
+
+  const { id } = getUserInfo(c);
+  console.log(id);
+
+  try {
+    const result = await pool.query<IReview>(`
+        SELECT reviews.id, reviews.rating, reviews.user_id, reviews.comment, reviews.created_at, users.first_name, users.last_name
+        FROM reviews
+        JOIN users ON reviews.user_id = users.id
+        WHERE reviews.user_id = $1`, [id]);
+    return c.json(result.rows);
+  } catch (error: any | PostgresError) {
+    const { status, message } = handleSQLError(error as PostgresError);
+    return c.json({ message }, status);
+  }
+
+});
+
 app.get("/:productId", async (c: Context) => {
   const productId = c.req.param("productId");
 
@@ -18,19 +37,23 @@ app.get("/:productId", async (c: Context) => {
 
   try {
     const q = await pool.query<IReview[]>(`
-      SELECT r.id, r.product_id, r.rating, r.comment, r.user_id, r.created_at, u.first_name, u.last_name 
-      FROM reviews r 
-      JOIN users u ON r.user_id = u.id 
-      WHERE r.product_id = $1 
-      LIMIT $2 OFFSET $3;`, [productId, limit, offset]);
+        SELECT r.id,
+               r.product_id,
+               r.rating,
+               r.comment,
+               r.user_id,
+               r.created_at,
+               u.first_name,
+               u.last_name
+        FROM reviews r
+                 JOIN users u ON r.user_id = u.id
+        WHERE r.product_id = $1
+            LIMIT $2
+        OFFSET $3;`, [productId, limit, offset]);
 
     const totalReviewsResult = await pool.query(`SELECT COUNT(*) FROM reviews WHERE product_id = $1`, [productId]);
     const totalReviews = parseInt(totalReviewsResult.rows[0].count);
     const totalPages = Math.ceil(totalReviews / limit);
-
-    if (q.rows.length === 0) {
-      return c.json({ message: "No reviews found" }, 404);
-    }
 
     return c.json({
       data: q.rows,
@@ -38,8 +61,8 @@ app.get("/:productId", async (c: Context) => {
         currentPage: page,
         totalPages,
         totalReviews,
-        limit,
-      },
+        limit
+      }
     });
   } catch (error: any | PostgresError) {
     const { status, message } = handleSQLError(error as PostgresError);
