@@ -13,9 +13,53 @@ app.get("/orders", authMiddleware, async (c: Context) => {
 
   const { id } = getUserInfo(c);
 
+  const { limit = 10, page = 1 } = c.req.query();
+
+  const parsedLimit = Number(limit);
+  const parsedPage = Number(page);
+  const offset = (parsedPage - 1) * parsedLimit;
+
+  const totalOrdersResult = await pool.query("SELECT COUNT(*) FROM orders WHERE user_id = $1", [id]);
+  const totalOrders = parseInt(totalOrdersResult.rows[0].count);
+  const totalPages = Math.ceil(totalOrders / parsedLimit);
+
   try {
-    const result = await pool.query<IUser>("SELECT * FROM orders WHERE user_id = $1", [id]);
-    return c.json(result.rows);
+    const result = await pool.query(`
+        SELECT o.*,
+               json_agg(json_build_object(
+                       'quantity', oi.quantity,
+                       'product_id', oi.product_id,
+                       'product_name', p.name,
+                       'product_image', p.image,
+                       'price', oi.price
+                        )) AS order_items,
+               json_build_object(
+                       'address_line1', sa.address_line1,
+                       'address_line2', sa.address_line2,
+                       'city', sa.city,
+                       'state', sa.state,
+                       'postal_code', sa.postal_code,
+                       'country', sa.country
+               )           AS shipping_address,
+               pm.payment_method
+        FROM orders o
+                 LEFT JOIN order_items oi ON oi.order_id = o.id
+                 LEFT JOIN products p ON oi.product_id = p.id
+                 LEFT JOIN shipping_addresses sa ON sa.order_id = o.id AND sa.user_id = o.user_id
+                 LEFT JOIN payments pm ON pm.order_id = o.id
+        WHERE o.user_id = $1
+        GROUP BY o.id, sa.address_line1, sa.address_line2, sa.city, sa.state, sa.postal_code, sa.country,
+                 pm.payment_method
+        LIMIT $2 OFFSET $3`, [id, limit, offset]);
+    return c.json({
+      data: result.rows,
+      pagination: {
+        currentPage: parsedPage,
+        totalPages,
+        totalOrders,
+        limit: parsedLimit
+      }
+    });
   } catch (error: any | PostgresError) {
     const { status, message } = handleSQLError(error as PostgresError);
     return c.json({ message }, status);
@@ -26,7 +70,7 @@ app.patch("/password", authMiddleware, async (c: Context) => {
 
   const { id } = getUserInfo(c);
 
-  const {newPassword} = await c.req.json();
+  const { newPassword } = await c.req.json();
 
   if (!newPassword) {
     return c.json({ message: "New password is required" }, 400);
@@ -43,7 +87,7 @@ app.patch("/password", authMiddleware, async (c: Context) => {
     const { status, message } = handleSQLError(error as PostgresError);
     return c.json({ message }, status);
   }
-})
+});
 
 app.get("/:id", async (c: Context) => {
 

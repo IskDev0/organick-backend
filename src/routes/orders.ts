@@ -4,8 +4,8 @@ import getUserInfo from "../utils/auth/getUserInfo";
 import pool from "../db/postgres";
 import PostgresError from "../types/PostgresError";
 import handleSQLError from "../utils/handleSQLError";
-import { IProduct } from "../types/IProduct";
 import checkRole from "../middleware/role";
+import { z } from 'zod';
 
 
 const app = new Hono();
@@ -67,67 +67,81 @@ app.get("/", authMiddleware, async (c: Context) => {
   }
 });
 
-app.post("/", authMiddleware, async (c: Context) => {
+const orderSchema = z.object({
+  items: z.array(z.object({
+    productId: z.number().positive(),
+    quantity: z.number().positive(),
+    price: z.number().nonnegative(),
+  })),
+  totalAmount: z.number().positive(),
+  address: z.object({
+    address_line1: z.string(),
+    address_line2: z.string(),
+    city: z.string(),
+    state: z.string(),
+    postal_code: z.string(),
+    country: z.string(),
+  }),
+  payment: z.object({
+    amount: z.number().positive(),
+    paymentMethod: z.string(),
+  })
+});
 
+app.post('/', async (c) => {
+  const { id } = getUserInfo(c);
+
+  const client = await pool.connect();
   try {
-    const userId = getUserInfo(c).id;
-    const { items, shippingAddress } = await c.req.json();
+    const { items, totalAmount, address, payment } = orderSchema.parse(await c.req.json());
 
-    const totalAmount = await calculateTotalAmount(items);
+    await client.query('BEGIN');
 
-    await pool.query("BEGIN");
-
-    const orderResult = await pool.query(
-      `
-      INSERT INTO orders (user_id, total_amount, status)
-      VALUES ($1, $2, 'pending') RETURNING id
-      `,
-      [userId, totalAmount]
-    );
+    const orderResult = await client.query(`
+        INSERT INTO orders (user_id, total_amount, status)
+        VALUES ($1, $2, 'pending') RETURNING id
+    `, [id, totalAmount]);
+    if (!orderResult.rows.length) throw new Error('Order creation failed');
     const orderId = orderResult.rows[0].id;
 
-    const orderItemsQuery = `
-      INSERT INTO order_items (order_id, product_id, quantity, price)
-      VALUES ($1, $2, $3, $4)
-    `;
-    for (const item of items) {
-      console.log(item);
-      await pool.query(orderItemsQuery, [
-        orderId,
-        item.id,
-        item.quantity,
-        item.price
-      ]);
+    const productIds = items.map(item => item.productId);
+    const quantities = items.map(item => item.quantity);
+    const prices = items.map(item => item.price);
+
+    await client.query(`
+        INSERT INTO order_items (order_id, product_id, quantity, price)
+        SELECT $1, UNNEST($2::int[]), UNNEST($3::int[]), UNNEST($4::float[])
+    `, [orderId, productIds, quantities, prices]);
+
+    await client.query(`
+      INSERT INTO shipping_addresses (user_id, order_id, address_line1, address_line2, city, state, postal_code, country)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, orderId, address.address_line1, address.address_line2, address.city, address.state, address.postal_code, address.country]);
+
+    if (payment) {
+      const { amount, paymentMethod } = payment;
+
+      if (amount !== totalAmount) throw new Error('Payment amount does not match order total');
+
+      await client.query(`
+        INSERT INTO payments (order_id, amount, payment_method, payment_status)
+        VALUES ($1, $2, $3, 'completed')
+      `, [orderId, amount, paymentMethod]);
+
+      await client.query(`
+        UPDATE orders SET status = 'paid' WHERE id = $1
+      `, [orderId]);
     }
 
-    // Insert the shipping address
-    // await pool.query(
-    //   `
-    //   INSERT INTO shipping_addresses (user_id, order_id, address_line1, address_line2, city, state, postal_code, country)
-    //   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    //   `,
-    //   [
-    //     userId,
-    //     orderId,
-    //     shippingAddress.address_line1,
-    //     shippingAddress.address_line2,
-    //     shippingAddress.city,
-    //     shippingAddress.state,
-    //     shippingAddress.postal_code,
-    //     shippingAddress.country,
-    //   ]
-    // );
+    await client.query('COMMIT');
 
-    await pool.query("COMMIT");
-
-    return c.json({ message: "Order created successfully" });
+    return c.json({ message: 'Order created successfully', orderId });
   } catch (error) {
-    await pool.query("ROLLBACK");
-    console.error("Failed to create order:", error);
-    return c.json(
-      { message: "Failed to create order", error: error.message },
-      500
-    );
+    await client.query('ROLLBACK');
+    console.error('Order creation failed:', error);
+    return c.json({ error: error.message }, 400);
+  } finally {
+    client.release();
   }
 });
 
@@ -155,19 +169,5 @@ app.delete("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
     return c.json({ message }, status);
   }
 })
-
-
-
-async function calculateTotalAmount(items:IProduct[]):Promise<string> {
-  let total = 0;
-
-  for (const item of items) {
-    const product = await pool.query(`SELECT price, discount FROM products WHERE id = $1`, [item.id]);
-    const price = product.rows[0].price * (1 - product.rows[0].discount / 100);
-    total += price * item.quantity;
-  }
-
-  return total.toFixed(2);
-}
 
 export default app;
