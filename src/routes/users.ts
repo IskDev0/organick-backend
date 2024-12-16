@@ -89,6 +89,80 @@ app.patch("/password", authMiddleware, async (c: Context) => {
   }
 });
 
+app.get("/address", authMiddleware, async (c: Context) => {
+
+  const { id } = getUserInfo(c);
+
+  try {
+    const result = await pool.query("SELECT * FROM user_addresses WHERE user_id = $1", [id]);
+    return c.json(result.rows);
+  } catch (error: any | PostgresError) {
+    const { status, message } = handleSQLError(error as PostgresError);
+    return c.json({ message }, status);
+  }
+});
+
+app.post("/address", authMiddleware, async (c: Context) => {
+
+  const { id } = getUserInfo(c);
+
+  const shippingAddress = await c.req.json();
+
+  try {
+    await pool.query(
+      `INSERT INTO user_addresses (user_id, address_line1, address_line2, city, state, postal_code, country)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [id, shippingAddress.address_line1, shippingAddress.address_line2, shippingAddress.city, shippingAddress.state, shippingAddress.postal_code, shippingAddress.country]);
+    return c.json({ message: "Shipping address created successfully" });
+  } catch (error: any | PostgresError) {
+    console.log(error);
+    const { status, message } = handleSQLError(error as PostgresError);
+    return c.json({ message }, status);
+  }
+});
+
+app.put("/address/:id", authMiddleware, async (c: Context) => {
+
+  const { id } = getUserInfo(c);
+
+  const addressId = c.req.param("id");
+
+  const shippingAddress = await c.req.json();
+
+  try {
+    await pool.query(
+      `UPDATE user_addresses
+       SET address_line1 = $1,
+           address_line2 = $2,
+           city          = $3,
+           state         = $4,
+           postal_code   = $5,
+           country       = $6
+        WHERE id = $7
+        AND user_id = $8`,
+      [shippingAddress.address_line1, shippingAddress.address_line2, shippingAddress.city, shippingAddress.state, shippingAddress.postal_code, shippingAddress.country, addressId, id]);
+    return c.json({ message: "Shipping address updated successfully" });
+  } catch (error: any | PostgresError) {
+    const { status, message } = handleSQLError(error as PostgresError);
+    return c.json({ message }, status);
+  }
+});
+
+app.delete("/address/:id", authMiddleware, async (c: Context) => {
+
+  const { id } = getUserInfo(c);
+
+  const addressId = c.req.param("id");
+
+  try {
+    await pool.query(`DELETE FROM user_addresses WHERE id = $1 AND user_id = $2`, [addressId, id]);
+    return c.json({ message: "Shipping address deleted successfully" });
+  } catch (error: any | PostgresError) {
+    const { status, message } = handleSQLError(error as PostgresError);
+    return c.json({ message }, status);
+  }
+})
+
 app.get("/:id", async (c: Context) => {
 
   const id = c.req.param("id");
