@@ -1,17 +1,15 @@
 import { Context, Hono } from "hono";
-import pool from "../db/postgres";
-import PostgresError from "../types/PostgresError";
-import handleSQLError from "../utils/handleSQLError";
+import prisma from "../db/prisma";
 
 const app = new Hono();
 
 app.get("/", async (c: Context) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM testimonials");
-    return c.json(rows);
-  } catch (error: any | PostgresError) {
-    const { status, message } = handleSQLError(error as PostgresError);
-    return c.json({ message }, status);
+    let testimonials = await prisma.testimonial.findMany()
+    return c.json(testimonials);
+  } catch (error: any) {
+    console.error(error);
+    return c.json({ message: error.message }, 500);
   }
 });
 

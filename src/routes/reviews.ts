@@ -1,46 +1,62 @@
 import { Context, Hono } from "hono";
-import pool from "../db/postgres";
-import { IReview } from "../types/IReview";
 import authMiddleware from "../middleware/auth";
-import checkRole from "../middleware/role";
 import getUserInfo from "../utils/auth/getUserInfo";
-import PostgresError from "../types/PostgresError";
-import handleSQLError from "../utils/handleSQLError";
+import prisma from "../db/prisma";
 
 const app = new Hono();
 
 app.get("/", authMiddleware, async (c: Context) => {
-
   const { id } = getUserInfo(c);
-
-  const { limit = 10, offset, page = 1 } = c.req.query();
-
-  const totalReviewsResult = await pool.query("SELECT COUNT(*) FROM reviews WHERE user_id = $1", [id]);
-  const totalReviews = parseInt(totalReviewsResult.rows[0].count);
-  const totalPages = Math.ceil(totalReviews / Number(limit));
+  const { limit = 10, offset = 0, page = 1 } = c.req.query();
 
   try {
-    const result = await pool.query(`
-        SELECT reviews.id,
-               reviews.rating,
-               reviews.user_id,
-               reviews.comment,
-               reviews.created_at,
-               users.first_name,
-               users.last_name,
-               products.id    AS product_id,
-               products.name  AS product_name,
-               products.image as product_image,
-               products.price
-        FROM reviews
-                 JOIN users ON reviews.user_id = users.id
-                 JOIN products ON reviews.product_id = products.id
-        WHERE reviews.user_id = $1
-            LIMIT $2
-        OFFSET $3
-    `, [id, limit, offset]);
+
+    const totalReviews = await prisma.review.count({
+      where: {
+        userId: id
+      }
+    });
+
+    const totalPages = Math.ceil(totalReviews / Number(limit));
+
+    const reviews = await prisma.review.findMany({
+      where: {
+        userId: id
+      },
+      skip: Number(offset),
+      take: Number(limit),
+      include: {
+        product: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            price: true
+          }
+        },
+        user: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
     return c.json({
-      data: result.rows,
+      data: reviews.map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        user_id: review.userId,
+        comment: review.comment,
+        created_at: review.createdAt,
+        first_name: review.user.firstName,
+        last_name: review.user.lastName,
+        product_id: review.product.id,
+        product_name: review.product.name,
+        product_image: review.product.image,
+        product_price: review.product.price
+      })),
       pagination: {
         currentPage: Number(page),
         totalPages,
@@ -48,44 +64,55 @@ app.get("/", authMiddleware, async (c: Context) => {
         limit: Number(limit)
       }
     });
-  } catch (error: any | PostgresError) {
-    const { status, message } = handleSQLError(error as PostgresError);
-    return c.json({ message }, status);
+  } catch (error: any) {
+    console.error("Error fetching reviews:", error);
+    return c.json({ message: error.message }, 500);
   }
-
 });
 
 app.get("/:productId", async (c: Context) => {
   const productId = c.req.param("productId");
-
   const page = parseInt(c.req.query("page") || "1");
   const limit = parseInt(c.req.query("limit") || "10");
   const offset = (page - 1) * limit;
 
   try {
-    const q = await pool.query<IReview[]>(`
-        SELECT r.id,
-               r.product_id,
-               r.rating,
-               r.comment,
-               r.user_id,
-               r.created_at,
-               u.first_name,
-               u.last_name
-        FROM reviews r
-                 JOIN users u ON r.user_id = u.id
-        WHERE r.product_id = $1
-            LIMIT $2
-        OFFSET $3;`, [productId, limit, offset]);
 
-    const totalReviewsResult = await pool.query(`SELECT COUNT(*)
-                                                 FROM reviews
-                                                 WHERE product_id = $1`, [productId]);
-    const totalReviews = parseInt(totalReviewsResult.rows[0].count);
+    const totalReviews = await prisma.review.count({
+      where: {
+        productId: productId
+      }
+    });
+
     const totalPages = Math.ceil(totalReviews / limit);
 
+    const reviews = await prisma.review.findMany({
+      where: {
+        productId: productId
+      },
+      skip: offset,
+      take: limit,
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
     return c.json({
-      data: q.rows,
+      data: reviews.map((review) => ({
+        id: review.id,
+        product_id: review.productId,
+        rating: review.rating,
+        comment: review.comment,
+        user_id: review.userId,
+        created_at: review.createdAt,
+        first_name: review.user.firstName,
+        last_name: review.user.lastName
+      })),
       pagination: {
         currentPage: page,
         totalPages,
@@ -93,9 +120,9 @@ app.get("/:productId", async (c: Context) => {
         limit
       }
     });
-  } catch (error: any | PostgresError) {
-    const { status, message } = handleSQLError(error as PostgresError);
-    return c.json({ message }, status);
+  } catch (error: any) {
+    console.error("Error fetching reviews:", error);
+    return c.json({ message: error.message }, 500);
   }
 });
 
@@ -103,52 +130,77 @@ app.post("/", authMiddleware, async (c: Context) => {
   const reviewBody = await c.req.json();
   const { id } = getUserInfo(c);
 
-  if (!reviewBody || !reviewBody.product_id || !reviewBody.rating || !reviewBody.comment) {
+  if (!reviewBody || !reviewBody.productId || !reviewBody.rating || !reviewBody.comment) {
     return c.json({ message: "Invalid review data" }, 400);
   }
 
   try {
-    await pool.query(
-      `INSERT INTO reviews (product_id, user_id, rating, comment)
-       VALUES ($1, $2, $3, $4)`,
-      [reviewBody.product_id, id, reviewBody.rating, reviewBody.comment]);
+
+    await prisma.review.create({
+      data: {
+        productId: reviewBody.productId,
+        userId: id,
+        rating: reviewBody.rating,
+        comment: reviewBody.comment
+      }
+    });
+
+    let avarateRating = await prisma.review.aggregate({
+      _avg: {
+        rating: true
+      },
+      where: {
+        productId: reviewBody.productId
+      }
+    })
+
+    await prisma.product.update({
+      where: {
+        id: reviewBody.productId
+      },
+      data: {
+        rating: avarateRating._avg.rating
+      }
+    })
+
     return c.json({ message: "Review created successfully" });
-  } catch (error: any | PostgresError) {
-    const { status, message } = handleSQLError(error as PostgresError);
-    return c.json({ message }, status);
+  } catch (error: any) {
+    console.error("Error creating review:", error);
+    return c.json({ message: error.message }, 500);
   }
 });
 
-app.patch("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
-  const reviewBody = await c.req.json();
-  const id = c.req.param("id");
-
-  if (!reviewBody || !reviewBody.rating || !reviewBody.comment) {
-    return c.json({ message: "Invalid review data" }, 400);
-  }
-
-  try {
-    const q = await pool.query<IReview[]>(`SELECT *
-                                           FROM reviews
-                                           WHERE id = $1`, [id]);
-    if (q.rows.length === 0) {
-      return c.json({ message: "Review not found" }, 404);
-    }
-
-    await pool.query(`UPDATE reviews
-                      SET rating = $1,
-                          comment = $2
-                      WHERE id = $3`,
-      [reviewBody.rating, reviewBody.comment, id]);
-    return c.json({ message: "Review updated successfully" });
-  } catch (error: any | PostgresError) {
-    const { status, message } = handleSQLError(error as PostgresError);
-    return c.json({ message }, status);
-  }
-});
+// app.patch("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
+//   const reviewBody = await c.req.json();
+//   const id = c.req.param("id");
+//
+//   if (!reviewBody || !reviewBody.rating || !reviewBody.comment) {
+//     return c.json({ message: "Invalid review data" }, 400);
+//   }
+//
+//   try {
+//     const q = await pool.query<IReview[]>(`SELECT *
+//                                            FROM reviews
+//                                            WHERE id = $1`, [id]);
+//     if (q.rows.length === 0) {
+//       return c.json({ message: "Review not found" }, 404);
+//     }
+//
+//     await pool.query(`UPDATE reviews
+//                       SET rating  = $1,
+//                           comment = $2
+//                       WHERE id = $3`,
+//       [reviewBody.rating, reviewBody.comment, id]);
+//     return c.json({ message: "Review updated successfully" });
+//   } catch (error: any | PostgresError) {
+//     const { status, message } = handleSQLError(error as PostgresError);
+//     return c.json({ message }, status);
+//   }
+// });
 
 app.delete("/:id", authMiddleware, async (c: Context) => {
-  const id = c.req.param("id");
+
+  const { id } = c.req.param();
   const userInfo = getUserInfo(c);
 
   if (!id) {
@@ -156,25 +208,31 @@ app.delete("/:id", authMiddleware, async (c: Context) => {
   }
 
   try {
-    const q = await pool.query<IReview[]>(`SELECT *
-                                           from reviews
-                                           where id = $1`, [id]);
-    if (q.rows.length === 0) {
+
+    const review = await prisma.review.findUnique({
+      where: { id }
+    });
+
+    const product = await prisma.product.findUnique({
+      where: { id: review.productId }
+    });
+
+    if (!review) {
       return c.json({ message: "Review not found" }, 404);
     }
 
-    //@ts-ignore
-    if (q.rows[0].user_id !== userInfo.id) {
+    if (review.userId !== userInfo.id) {
       return c.json({ message: "You are not allowed to delete this review" }, 401);
     }
 
-    await pool.query(`DELETE
-                      FROM reviews
-                      WHERE id = $1`, [id]);
+    await prisma.review.delete({
+      where: { id }
+    });
+
     return c.json({ message: "Review deleted successfully" });
-  } catch (error: any | PostgresError) {
-    const { status, message } = handleSQLError(error as PostgresError);
-    return c.json({ message }, status);
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    return c.json({ message: "Internal server error" }, 500);
   }
 });
 

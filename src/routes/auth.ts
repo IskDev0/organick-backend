@@ -25,14 +25,14 @@ app.post("/register", async (c: Context) => {
         lastName: userBody.last_name,
         passwordHash: hashedPassword,
         email: userBody.email,
-        phone: userBody.phone,
-      },
+        phone: userBody.phone
+      }
     });
 
     const payload = {
       id: user.id,
       role: user.role,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 // 1 hour
     };
 
     const accessToken = await sign(payload, process.env.ACCESS_SECRET as string);
@@ -40,7 +40,7 @@ app.post("/register", async (c: Context) => {
       {
         id: user.id,
         role: user.role,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
+        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours
       },
       process.env.REFRESH_SECRET as string
     );
@@ -49,14 +49,14 @@ app.post("/register", async (c: Context) => {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60, // 1 hour
+      maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
     return c.json({
@@ -65,7 +65,7 @@ app.post("/register", async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role,
+      role: user.role
     });
   } catch (error) {
     return c.json({ message: error }, 500);
@@ -81,7 +81,7 @@ app.post("/login", async (c: Context) => {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { email: userBody.email },
+      where: { email: userBody.email }
     });
 
     if (!user) {
@@ -102,7 +102,7 @@ app.post("/login", async (c: Context) => {
     const payload = {
       id: user.id,
       role: user.role,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 // 1 hour
     };
 
     const accessToken = await sign(payload, process.env.ACCESS_SECRET as string);
@@ -110,7 +110,7 @@ app.post("/login", async (c: Context) => {
       {
         id: user.id,
         role: user.role,
-        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24 hours
+        exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours
       },
       process.env.REFRESH_SECRET as string
     );
@@ -119,14 +119,14 @@ app.post("/login", async (c: Context) => {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60, // 1 hour
+      maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
     return c.json({
@@ -135,10 +135,10 @@ app.post("/login", async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role,
+      role: user.role
     });
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+    console.error("Error logging in:", error);
     return c.json({ message: error.message }, 500);
   }
 });
@@ -148,7 +148,7 @@ app.get("/user", authMiddleware, async (c: Context) => {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id }
     });
 
     if (!user) {
@@ -161,9 +161,10 @@ app.get("/user", authMiddleware, async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role,
+      role: user.role
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Error getting user:", error);
     return c.json({ message: error.message }, 500);
   }
 });
@@ -186,14 +187,14 @@ app.post("/refresh", async (c: Context) => {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60, // 1 hour
+      maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
     return c.json({ message: "Tokens refreshed successfully" });
@@ -207,14 +208,14 @@ app.post("/logout", (c: Context) => {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 0,
+    maxAge: 0
   });
 
   setCookie(c, "refreshToken", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 0,
+    maxAge: 0
   });
 
   return c.json({ message: "Logout successful" });
