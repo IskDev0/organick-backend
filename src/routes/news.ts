@@ -8,6 +8,22 @@ const prisma = new PrismaClient();
 
 const app = new Hono();
 
+app.get("/authors", authMiddleware, checkRole(["admin"]), async (c: Context) => {
+
+  try {
+    const authors = await prisma.user.findMany({
+      where: {
+        OR: [{ role: "author" }, { role: "admin" }]
+      },
+      select: { id: true, firstName: true, lastName: true }
+    });
+    return c.json(authors);
+  } catch (error: any) {
+    console.error(error);
+    return c.json({ message: error.message }, 500);
+  }
+});
+
 app.get("/author/:id", async (c: Context) => {
   const id = c.req.param("id");
 
@@ -38,7 +54,7 @@ app.get("/", async (c: Context) => {
   const offset = (page - 1) * limit;
 
   try {
-    const [news, totalNews] = await prisma.$transaction([
+    const [news, total] = await prisma.$transaction([
       prisma.news.findMany({
         skip: offset,
         take: limit,
@@ -51,16 +67,91 @@ app.get("/", async (c: Context) => {
       prisma.news.count()
     ]);
 
-    const totalPages = Math.ceil(totalNews / limit);
+    const totalPages = Math.ceil(total / limit);
 
     return c.json({
       data: news,
       pagination: {
         currentPage: page,
         totalPages,
-        totalNews,
+        total,
         limit
       }
+    });
+  } catch (error: any) {
+    console.error(error);
+    return c.json({ message: error.message }, 500);
+  }
+});
+
+app.get("/search", async (c: Context) => {
+  const { title, userId, date, limit = 10, page = 1, order = "desc" } = c.req.query();
+  const parsedLimit = Number(limit);
+  const parsedPage = Number(page);
+  const offset = (parsedPage - 1) * parsedLimit;
+
+  try {
+    // Формируем условие для фильтрации в зависимости от переданных параметров
+    const filterConditions: any = {};
+
+    if (title) {
+      filterConditions.title = {
+        contains: title as string,
+      };
+    }
+
+    if (userId) {
+      filterConditions.userId = userId;
+    }
+
+    if (date) {
+      const timestamp = Number(date);
+      if (!isNaN(timestamp)) {
+        const parsedDate = new Date(timestamp * 1000); // Преобразование UNIX timestamp в миллисекунды
+        const startOfDay = new Date(parsedDate);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(parsedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        filterConditions.createdAt = {
+          gte: startOfDay,
+          lte: endOfDay,
+        };
+      } else {
+        throw new Error("Invalid timestamp format");
+      }
+    }
+
+    const [news, total] = await prisma.$transaction([
+      prisma.news.findMany({
+        where: filterConditions,
+        skip: offset,
+        take: parsedLimit,
+        orderBy: {
+          updatedAt: order === "asc" ? "asc" : "desc", // Сортировка по времени обновления
+        },
+        include: {
+          user: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      }),
+      prisma.news.count({
+        where: filterConditions,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / parsedLimit);
+
+    return c.json({
+      data: news,
+      pagination: {
+        currentPage: parsedPage,
+        totalPages,
+        total,
+        limit: parsedLimit,
+      },
     });
   } catch (error: any) {
     console.error(error);
