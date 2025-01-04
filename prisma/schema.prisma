@@ -28,14 +28,22 @@ model User {
   phone        String?
   passwordHash String
   image        String?
-  role         Role     @default(customer)
+  roleId       Int      @default(1)
   createdAt    DateTime @default(now()) @db.Timestamptz(0)
   updatedAt    DateTime @updatedAt
-  orders       Order[]
-  reviews      Review[]
-  news         News[]
 
   UserAddress UserAddress[]
+  role        UserRole      @relation(fields: [roleId], references: [id])
+  Review      Review[]
+  Order       Order[]
+  News        News[]
+}
+
+model UserRole {
+  id   Int @id @default(autoincrement())
+  name String @unique
+
+  users User[]
 }
 
 model Category {
@@ -162,14 +170,14 @@ enum ApplicationStatus {
 }
 
 model Application {
-  id        String   @id @default(uuid())
+  id        String            @id @default(uuid())
   fullName  String
   email     String
   company   String
   subject   String
   message   String
   status    ApplicationStatus @default(new)
-  createdAt DateTime @default(now()) @db.Timestamptz(0)
+  createdAt DateTime          @default(now()) @db.Timestamptz(0)
 }
 
 model UserAddress {

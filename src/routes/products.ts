@@ -48,15 +48,29 @@ app.get("/search", async (c: Context) => {
     }
 
     return c.json({
-      data: products.map(product => ({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        discount: product.discount,
-        rating: product.rating,
-        image: product.image,
-        category: product.category.name
-      })),
+      data: products.map(product => {
+        const oldPrice = Number(product.price);
+        const discount = Number(product.discount);
+        const price = discount
+          ? oldPrice - (oldPrice * discount) / 100
+          : oldPrice;
+
+        const result: any = {
+          id: product.id,
+          name: product.name,
+          price: price.toFixed(2),
+          discount,
+          rating: product.rating,
+          image: product.image,
+          category: product.category.name
+        };
+
+        if (discount > 0) {
+          result.oldPrice = oldPrice.toFixed(2);
+        }
+
+        return result;
+      }),
       pagination: {
         currentPage: parsedPage,
         totalPages,
@@ -105,6 +119,12 @@ app.get("/", async (c: Context) => {
     const totalPages = Math.ceil(total / limit);
 
     const productData = products.map((product) => {
+      const oldPrice = Number(product.price);
+      const discount = Number(product.discount);
+      const price = discount
+        ? oldPrice - (oldPrice * discount) / 100
+        : oldPrice;
+
       const totalReviews = product.reviews.length;
       const averageRating =
         totalReviews > 0
@@ -114,8 +134,9 @@ app.get("/", async (c: Context) => {
       return {
         id: product.id,
         name: product.name,
-        price: product.price,
-        discount: product.discount,
+        oldPrice: discount > 0 ? oldPrice.toFixed(2) : null,
+        price: price.toFixed(2),
+        discount,
         image: product.image,
         category: product.category?.name,
         rating: parseFloat(averageRating.toFixed(1))
@@ -160,11 +181,19 @@ app.get("/:id", async (c: Context) => {
       return c.json({ message: "Product not found" }, 404);
     }
 
+    const oldPrice = product.discount
+      ? product.price
+      : null;
+    const price = product.discount
+      ? product.price - (product.price * product.discount / 100)
+      : product.price;
+
     return c.json({
       id: product.id,
       name: product.name,
-      price: product.price,
-      discount: product.discount,
+      price: price.toFixed(2),
+      oldPrice: oldPrice.toFixed(2),
+      discount: Number(product.discount),
       rating: product.rating,
       image: product.image,
       description: product.description,
@@ -178,7 +207,7 @@ app.get("/:id", async (c: Context) => {
   }
 });
 
-app.post("/", async (c) => {
+app.post("/", authMiddleware, checkRole("admin"), async (c) => {
   try {
     const formData = await c.req.formData();
 
@@ -241,17 +270,13 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
   const stock = Number(formData.get("stock") || 0);
   const categoryId = Number(formData.get("categoryId"));
   const discount = Number(formData.get("discount") || 0);
-  const imageFile = formData.get("image") as File;
+  const imageFile = formData.get("image");
 
-  if (!name || !price || !categoryId) {
-    return c.json({ message: "Name, price, categoryId, and image are required" }, 400);
+  if (!name || isNaN(price) || isNaN(categoryId)) {
+    return c.json({ message: "Name, price, and categoryId are required" }, 400);
   }
 
   try {
-
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
     const product = await prisma.product.findUnique({
       where: { id: id },
       select: { image: true }
@@ -263,7 +288,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
 
     let imageUrl = product.image;
 
-    if (imageFile) {
+    if (imageFile instanceof File) {
       if (imageUrl) {
         const imageKey = imageUrl.split("/").slice(-1)[0];
         const deleteParams = {
@@ -278,6 +303,9 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
           return c.json({ message: "Error deleting old image from S3" }, 500);
         }
       }
+
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
       const imageKey = `products/${nanoid()}-${imageFile.name}`;
       const uploadParams = {
@@ -315,6 +343,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
     return c.json({ message: (error as Error).message }, 500);
   }
 });
+
 
 app.delete("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
   const { id } = c.req.param();

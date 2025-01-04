@@ -14,7 +14,7 @@ const checkRole = (requiredRoles: string | string[]) => {
 
     const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
 
-    if (!roles.includes(payload.role as string)) {
+    if (!roles.includes((payload.roleName as string).toLowerCase())) {
       return c.json({ message: "You are not allowed to access this resource" }, 403);
     }
 

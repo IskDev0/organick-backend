@@ -1,11 +1,10 @@
 import { Context, Hono } from "hono";
 import authMiddleware from "../middleware/auth";
 import getUserInfo from "../utils/auth/getUserInfo";
-import { PrismaClient } from "@prisma/client";
+import prisma from "../db/prisma";
+import checkRole from "../middleware/role";
 
 const app = new Hono();
-
-const prisma = new PrismaClient();
 
 app.get("/orders", authMiddleware, async (c: Context) => {
   const { id } = getUserInfo(c);
@@ -187,6 +186,83 @@ app.delete("/address/:id", authMiddleware, async (c: Context) => {
   }
 });
 
+app.get("/roles", authMiddleware, checkRole("admin"), async (c: Context) => {
+
+  try {
+    const roles = await prisma.userRole.findMany();
+
+    return c.json(roles);
+  } catch (error: any) {
+    console.error("Error fetching users:", error);
+    return c.json({ message: error.message }, 500);
+  }
+});
+
+app.get("/", authMiddleware, checkRole("admin"), async (c: Context) => {
+  try {
+
+    const search = c.req.query("search") || "";
+    const roleId = Number(c.req.query("roleId")) || null;
+    const page = parseInt(c.req.query("page") || "1", 10);
+    const limit = parseInt(c.req.query("limit") || "10", 10);
+
+    const filters: any = {
+      OR: [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } }
+      ]
+    };
+
+    if (roleId) {
+      filters.roleId = roleId;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const users = await prisma.user.findMany({
+      where: filters,
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        image: true,
+        createdAt: true,
+        updatedAt: true,
+        role: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+
+    const totalCount = await prisma.user.count({ where: filters });
+
+    const usersWithRoleName = users.map((user) => ({
+      ...user,
+      role: user.role?.name
+    }));
+
+    return c.json({
+      data: usersWithRoleName,
+      pagination: {
+        total: totalCount,
+        currentPage: page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    });
+  } catch (error: any) {
+    console.error("Error fetching users:", error);
+    return c.json({ message: error.message }, 500);
+  }
+});
+
 app.get("/:id", async (c: Context) => {
   const id = c.req.param("id");
 
@@ -230,6 +306,42 @@ app.put("/", authMiddleware, async (c: Context) => {
     return c.json({ message: "User updated successfully", user: updatedUser });
   } catch (error: any) {
     console.error("Error updating user:", error);
+    return c.json({ message: error.message }, 500);
+  }
+});
+
+app.patch("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
+
+  const id = c.req.param("id");
+  const { roleId } = await c.req.json();
+
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        roleId
+      }
+    });
+
+    return c.json({ message: "User role updated successfully", user: updatedUser });
+  } catch (error: any) {
+    console.error("Error updating user role:", error);
+    return c.json({ message: error.message }, 500);
+  }
+});
+
+app.delete("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
+
+  const id = c.req.param("id");
+
+  try {
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    return c.json({ message: "User deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting user:", error);
     return c.json({ message: error.message }, 500);
   }
 });

@@ -19,27 +19,34 @@ app.post("/register", async (c: Context) => {
   const hashedPassword: string = await Bun.password.hash(userBody.password);
 
   try {
+
     const user = await prisma.user.create({
       data: {
         firstName: userBody.first_name,
         lastName: userBody.last_name,
         passwordHash: hashedPassword,
         email: userBody.email,
-        phone: userBody.phone
+        phone: userBody.phone,
+        roleId: userBody.roleId
+      },
+      include: {
+        role: true
       }
     });
 
     const payload = {
       id: user.id,
-      role: user.role,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 // 1 hour
+      roleId: user.roleId,
+      roleName: user.role.name,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60
     };
 
     const accessToken = await sign(payload, process.env.ACCESS_SECRET as string);
     const refreshToken = await sign(
       {
         id: user.id,
-        role: user.role,
+        roleId: user.roleId,
+        roleName: user.role.name,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours
       },
       process.env.REFRESH_SECRET as string
@@ -65,9 +72,10 @@ app.post("/register", async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role
+      roleName: user.role.name
     });
   } catch (error) {
+    console.log(error);
     return c.json({ message: error }, 500);
   }
 });
@@ -81,7 +89,23 @@ app.post("/login", async (c: Context) => {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { email: userBody.email }
+      where: {
+        email: userBody.email,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        passwordHash: true,
+        roleId: true,
+        role: {
+          select: {
+            name: true
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -99,9 +123,12 @@ app.post("/login", async (c: Context) => {
       return c.json({ message: "Invalid password" }, 422);
     }
 
+    console.log("user: ", user);
+
     const payload = {
       id: user.id,
-      role: user.role,
+      roleId: user.roleId,
+      roleName: user.role.name,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 // 1 hour
     };
 
@@ -109,7 +136,8 @@ app.post("/login", async (c: Context) => {
     const refreshToken = await sign(
       {
         id: user.id,
-        role: user.role,
+        roleId: user.roleId,
+        roleName: user.role.name,
         exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 // 24 hours
       },
       process.env.REFRESH_SECRET as string
@@ -135,7 +163,6 @@ app.post("/login", async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role
     });
   } catch (error: any) {
     console.error("Error logging in:", error);
@@ -161,7 +188,6 @@ app.get("/user", authMiddleware, async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
-      role: user.role
     });
   } catch (error: any) {
     console.error("Error getting user:", error);
