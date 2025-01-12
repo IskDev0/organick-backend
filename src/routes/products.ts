@@ -181,18 +181,17 @@ app.get("/:id", async (c: Context) => {
       return c.json({ message: "Product not found" }, 404);
     }
 
-    const oldPrice = product.discount
-      ? product.price
-      : null;
-    const price = product.discount
-      ? product.price - (product.price * product.discount / 100)
-      : product.price;
+    const oldPrice = Number(product.price);
+    const discount = Number(product.discount);
+    const price = discount
+      ? oldPrice - (oldPrice * discount) / 100
+      : oldPrice;
 
     return c.json({
       id: product.id,
       name: product.name,
+      oldPrice: discount > 0 ? oldPrice.toFixed(2) : null,
       price: price.toFixed(2),
-      oldPrice: oldPrice.toFixed(2),
       discount: Number(product.discount),
       rating: product.rating,
       image: product.image,
