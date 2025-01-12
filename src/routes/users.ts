@@ -30,6 +30,8 @@ app.get("/orders", authMiddleware, async (c: Context) => {
         id: true,
         createdAt: true,
         updatedAt: true,
+        status: true,
+        totalAmount: true,
         orderItems: {
           select: {
             quantity: true,
@@ -43,7 +45,7 @@ app.get("/orders", authMiddleware, async (c: Context) => {
             }
           }
         },
-        ShippingAddress: {
+        UserAddress: {
           select: {
             addressLine1: true,
             addressLine2: true,
