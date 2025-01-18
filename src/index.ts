@@ -11,6 +11,7 @@ import orders from "./routes/orders";
 import users from "./routes/users";
 import other from "./routes/other";
 import applications from "./routes/applications";
+import analytics from "./routes/analytics";
 
 const app = new Hono().basePath("/api/v1")
 
@@ -19,8 +20,6 @@ app.use("*", cors({
   credentials: true,
 }))
 app.use(logger())
-
-//TODO: Extract sql queries to db folder
 
 app.route("/auth", auth)
 app.route("/products", products)
@@ -32,6 +31,7 @@ app.route("/orders", orders)
 app.route("/users", users)
 app.route("/other", other)
 app.route("/applications", applications)
+app.route("/analytics", analytics)
 
 export default {
   port: process.env.PORT,

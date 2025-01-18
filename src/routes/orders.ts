@@ -6,11 +6,12 @@ import prisma from "../db/prisma";
 import { OrderStatus, PaymentStatus } from "@prisma/client";
 import convertObjectsToArrays from "../utils/excel/convertObjectsToArrays";
 import createExcelFile from "../utils/excel/createExcelFile";
+import checkRole from "../middleware/role";
 
 
 const app = new Hono();
 
-app.get("/", async (c: Context) => {
+app.get("/", authMiddleware, checkRole("admin"), async (c: Context) => {
   const {
     limit = 10,
     page = 1,
