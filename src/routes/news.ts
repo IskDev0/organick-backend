@@ -2,9 +2,7 @@ import { Context, Hono } from "hono";
 import authMiddleware from "../middleware/auth";
 import checkRole from "../middleware/role";
 import getUserInfo from "../utils/auth/getUserInfo";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../db/prisma";
 
 const app = new Hono();
 
@@ -13,7 +11,7 @@ app.get("/authors", authMiddleware, checkRole(["admin"]), async (c: Context) => 
   try {
     const authors = await prisma.user.findMany({
       where: {
-        OR: [{ role: "author" }, { role: "admin" }]
+        OR: [{roleId: 2 }, { roleId: 3 }] //admin and author
       },
       select: { id: true, firstName: true, lastName: true }
     });
@@ -91,7 +89,6 @@ app.get("/search", async (c: Context) => {
   const offset = (parsedPage - 1) * parsedLimit;
 
   try {
-    // Формируем условие для фильтрации в зависимости от переданных параметров
     const filterConditions: any = {};
 
     if (title) {
@@ -107,7 +104,7 @@ app.get("/search", async (c: Context) => {
     if (date) {
       const timestamp = Number(date);
       if (!isNaN(timestamp)) {
-        const parsedDate = new Date(timestamp * 1000); // Преобразование UNIX timestamp в миллисекунды
+        const parsedDate = new Date(timestamp * 1000);
         const startOfDay = new Date(parsedDate);
         startOfDay.setHours(0, 0, 0, 0);
 
@@ -129,7 +126,7 @@ app.get("/search", async (c: Context) => {
         skip: offset,
         take: parsedLimit,
         orderBy: {
-          updatedAt: order === "asc" ? "asc" : "desc", // Сортировка по времени обновления
+          updatedAt: order === "asc" ? "asc" : "desc",
         },
         include: {
           user: {
