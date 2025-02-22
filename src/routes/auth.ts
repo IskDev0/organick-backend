@@ -54,15 +54,17 @@ app.post("/register", async (c: Context) => {
 
     setCookie(c, "accessToken", accessToken, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
+      domain: process.env.FRONTEND_DOMAIN,
       maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
+      domain: process.env.FRONTEND_DOMAIN,
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -90,7 +92,7 @@ app.post("/login", async (c: Context) => {
   try {
     const user = await prisma.user.findUnique({
       where: {
-        email: userBody.email,
+        email: userBody.email
       },
       select: {
         id: true,
@@ -145,15 +147,17 @@ app.post("/login", async (c: Context) => {
 
     setCookie(c, "accessToken", accessToken, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
+      domain: process.env.FRONTEND_DOMAIN,
       maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
+      domain: process.env.FRONTEND_DOMAIN,
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -162,7 +166,7 @@ app.post("/login", async (c: Context) => {
       first_name: user.firstName,
       last_name: user.lastName,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone
     });
   } catch (error: any) {
     console.error("Error logging in:", error);
@@ -187,7 +191,7 @@ app.get("/user", authMiddleware, async (c: Context) => {
       first_name: user.firstName,
       last_name: user.lastName,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone
     });
   } catch (error: any) {
     console.error("Error getting user:", error);
@@ -211,15 +215,17 @@ app.post("/refresh", async (c: Context) => {
 
     setCookie(c, "accessToken", tokens.accessToken, {
       httpOnly: false,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
+      domain: process.env.FRONTEND_DOMAIN,
       maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
+      domain: process.env.FRONTEND_DOMAIN,
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -232,15 +238,17 @@ app.post("/refresh", async (c: Context) => {
 app.post("/logout", (c: Context) => {
   setCookie(c, "accessToken", "", {
     httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
+    domain: process.env.FRONTEND_DOMAIN,
     maxAge: 0
   });
 
   setCookie(c, "refreshToken", "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
+    domain: process.env.FRONTEND_DOMAIN,
     maxAge: 0
   });
 
