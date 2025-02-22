@@ -57,6 +57,7 @@ app.post("/register", async (c: Context) => {
       secure: true,
       sameSite: "none",
       domain: process.env.FRONTEND_DOMAIN,
+      path: "/",
       maxAge: 60 * 60 // 1 hour
     });
 
@@ -65,6 +66,7 @@ app.post("/register", async (c: Context) => {
       secure: true,
       sameSite: "none",
       domain: process.env.FRONTEND_DOMAIN,
+      path: "/",
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -125,8 +127,6 @@ app.post("/login", async (c: Context) => {
       return c.json({ message: "Invalid password" }, 422);
     }
 
-    console.log("user: ", user);
-
     const payload = {
       id: user.id,
       roleId: user.roleId,
@@ -150,6 +150,7 @@ app.post("/login", async (c: Context) => {
       secure: true,
       sameSite: "none",
       domain: process.env.FRONTEND_DOMAIN,
+      path: "/",
       maxAge: 60 * 60 // 1 hour
     });
 
@@ -158,6 +159,7 @@ app.post("/login", async (c: Context) => {
       secure: true,
       sameSite: "none",
       domain: process.env.FRONTEND_DOMAIN,
+      path: "/",
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -218,6 +220,7 @@ app.post("/refresh", async (c: Context) => {
       secure: true,
       sameSite: "none",
       domain: process.env.FRONTEND_DOMAIN,
+      path: "/",
       maxAge: 60 * 60 // 1 hour
     });
 
@@ -226,6 +229,7 @@ app.post("/refresh", async (c: Context) => {
       secure: true,
       sameSite: "none",
       domain: process.env.FRONTEND_DOMAIN,
+      path: "/",
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -241,6 +245,7 @@ app.post("/logout", (c: Context) => {
     secure: true,
     sameSite: "none",
     domain: process.env.FRONTEND_DOMAIN,
+    path: "/",
     maxAge: 0
   });
 
@@ -249,6 +254,7 @@ app.post("/logout", (c: Context) => {
     secure: true,
     sameSite: "none",
     domain: process.env.FRONTEND_DOMAIN,
+    path: "/",
     maxAge: 0
   });
 
