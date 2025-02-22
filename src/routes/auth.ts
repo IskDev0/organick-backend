@@ -168,7 +168,8 @@ app.post("/login", async (c: Context) => {
       first_name: user.firstName,
       last_name: user.lastName,
       email: user.email,
-      phone: user.phone
+      phone: user.phone,
+      role: user.role.name
     });
   } catch (error: any) {
     console.error("Error logging in:", error);
