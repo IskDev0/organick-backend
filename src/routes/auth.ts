@@ -55,14 +55,18 @@ app.post("/register", async (c: Context) => {
     setCookie(c, "accessToken", accessToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+      path: "/",
       maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+      path: "/",
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -146,14 +150,18 @@ app.post("/login", async (c: Context) => {
     setCookie(c, "accessToken", accessToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+      path: "/",
       maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+      path: "/",
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -175,12 +183,26 @@ app.get("/user", authMiddleware, async (c: Context) => {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { id }
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: {
+          select: {
+            name: true
+          }
+        }
+      }
     });
 
     if (!user) {
       return c.json({ message: "User not found" }, 404);
     }
+
+    console.log(user);
 
     return c.json({
       id: user.id,
@@ -188,6 +210,7 @@ app.get("/user", authMiddleware, async (c: Context) => {
       last_name: user.lastName,
       email: user.email,
       phone: user.phone,
+      role: user.role.name.toLowerCase()
     });
   } catch (error: any) {
     console.error("Error getting user:", error);
@@ -212,14 +235,18 @@ app.post("/refresh", async (c: Context) => {
     setCookie(c, "accessToken", tokens.accessToken, {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+      path: "/",
       maxAge: 60 * 60 // 1 hour
     });
 
     setCookie(c, "refreshToken", tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+      path: "/",
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
@@ -233,14 +260,18 @@ app.post("/logout", (c: Context) => {
   setCookie(c, "accessToken", "", {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+    path: "/",
     maxAge: 0
   });
 
   setCookie(c, "refreshToken", "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    domain: process.env.NODE_ENV === "production" ? process.env.FRONTEND_DOMAIN : undefined,
+    path: "/",
     maxAge: 0
   });
 

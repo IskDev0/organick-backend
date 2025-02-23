@@ -57,6 +57,7 @@ model Product {
   createdAt   DateTime @default(now()) @db.Timestamptz(0)
   updatedAt   DateTime @updatedAt
   categoryId  Int
+  isDeleted   Boolean  @default(false)
 
   category   Category    @relation(fields: [categoryId], references: [id])
   reviews    Review[]

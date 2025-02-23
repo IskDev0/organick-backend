@@ -111,6 +111,9 @@ app.get("/", async (c: Context) => {
           reviews: {
             select: { rating: true }
           }
+        },
+        where: {
+          isDeleted: false
         }
       }),
       prisma.product.count()
@@ -166,7 +169,10 @@ app.get("/:id", async (c: Context) => {
 
   try {
     const product = await prisma.product.findUnique({
-      where: { id },
+      where: {
+        id,
+        isDeleted: false
+      },
       include: {
         category: {
           select: {
@@ -225,16 +231,16 @@ app.post("/", authMiddleware, checkRole("admin"), async (c) => {
     const arrayBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    const imageKey = `products/${nanoid()}-${imageFile.name}`;
+    const imageKey = `${nanoid()}-${imageFile.name}`;
     const uploadParams = {
-      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Bucket: process.env.R2_PRODUCTS_BUCKET_NAME,
       Key: imageKey,
       Body: buffer,
       ContentType: imageFile.type
     };
 
     await s3.send(new PutObjectCommand(uploadParams));
-    const imageUrl = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${imageKey}`;
+    const imageUrl = `${process.env.R2_PRODUCTS_BUCKET_URL}/${imageKey}`;
 
     const newProduct = await prisma.product.create({
       data: {
@@ -291,7 +297,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
       if (imageUrl) {
         const imageKey = imageUrl.split("/").slice(-1)[0];
         const deleteParams = {
-          Bucket: process.env.AWS_S3_BUCKET_NAME,
+          Bucket: process.env.R2_PRODUCTS_BUCKET_NAME,
           Key: `products/${imageKey}`
         };
 
@@ -308,7 +314,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
 
       const imageKey = `products/${nanoid()}-${imageFile.name}`;
       const uploadParams = {
-        Bucket: process.env.AWS_S3_BUCKET_NAME,
+        Bucket: process.env.R2_PRODUCTS_BUCKET_NAME,
         Key: imageKey,
         Body: buffer,
         ContentType: imageFile.type
@@ -367,8 +373,8 @@ app.delete("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
     if (imageUrl) {
       const imageKey = imageUrl.split("/").slice(-1)[0];
       const deleteParams = {
-        Bucket: process.env.AWS_S3_BUCKET_NAME,
-        Key: `products/${imageKey}`
+        Bucket: process.env.R2_PRODUCTS_BUCKET_NAME,
+        Key: `${imageKey}`
       };
 
       try {
@@ -379,8 +385,13 @@ app.delete("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
       }
     }
 
-    await prisma.product.delete({
-      where: { id: id }
+    await prisma.review.deleteMany({ where: { productId: id } });
+
+    await prisma.product.update({
+      where: { id: id },
+      data: {
+        isDeleted: true
+      }
     });
 
     return c.json({ message: "Product deleted successfully" });
