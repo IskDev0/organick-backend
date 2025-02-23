@@ -298,7 +298,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
         const imageKey = imageUrl.split("/").slice(-1)[0];
         const deleteParams = {
           Bucket: process.env.R2_PRODUCTS_BUCKET_NAME,
-          Key: `products/${imageKey}`
+          Key: `${imageKey}`
         };
 
         try {
@@ -312,7 +312,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
       const arrayBuffer = await imageFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
-      const imageKey = `products/${nanoid()}-${imageFile.name}`;
+      const imageKey = `${nanoid()}-${imageFile.name}`;
       const uploadParams = {
         Bucket: process.env.R2_PRODUCTS_BUCKET_NAME,
         Key: imageKey,
@@ -322,7 +322,7 @@ app.put("/:id", authMiddleware, checkRole("admin"), async (c: Context) => {
 
       try {
         await s3.send(new PutObjectCommand(uploadParams));
-        imageUrl = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${uploadParams.Key}`;
+        imageUrl = `${process.env.R2_PRODUCTS_BUCKET_URL}/${uploadParams.Key}`;
       } catch (s3Error) {
         console.error("Failed to upload new image to S3:", s3Error);
         return c.json({ message: "Error uploading new image to S3" }, 500);
